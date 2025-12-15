@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Ultimate Flashcards - NVIDIA Engineer Edition</title>
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #76b852 0%, #8DC26F 100%); /* NVIDIA Green-ish style */
+            --card-bg: #ffffff;
+            --glass-bg: rgba(0, 0, 0, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text-color: #333;
+            --highlight-color: #76b852;
+            --success-color: #2ecc71;
+            --accent-color: #76b852;
+            --error-color: #e74c3c;
+            --hidden-text-color: rgba(0, 0, 0, 0); 
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a; /* Dark theme background */
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            color: white;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
+        body::-webkit-scrollbar { display: none; }
+
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+            width: 100%;
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        /* === Combo 特效 === */
+        .combo-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 1.5em;
+            font-weight: 900;
+            color: #f1c40f;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            opacity: 0;
+            transform: scale(0.8);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 100;
+            pointer-events: none;
+            font-style: italic;
+        }
+
+        .combo-active { opacity: 1; transform: scale(1.1) rotate(-5deg); }
+        .combo-fire {
+            color: #ff6b6b;
+            text-shadow: 0 0 10px #f39c12, 0 0 20px #e74c3c;
+            animation: shake 0.5s infinite;
+        }
+
+        @keyframes shake {
+            0% { transform: scale(1.1) rotate(-5deg) translate(0, 0); }
+            25% { transform: scale(1.2) rotate(-8deg) translate(-2px, 2px); }
+            50% { transform: scale(1.1) rotate(-2deg) translate(2px, -2px); }
+            75% { transform: scale(1.2) rotate(-5deg) translate(-2px, -2px); }
+            100% { transform: scale(1.1) rotate(-5deg) translate(0, 0); }
+        }
+
+        /* === 卡片設計 === */
+        .card-wrapper {
+            width: 100%;
+            height: 45vh;
+            min-height: 350px;
+            margin-bottom: 20px;
+            position: relative;
+            perspective: 1000px;
+            margin-top: 30px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            color: var(--text-color);
+            width: 100%;
+            height: 100%;
+            border-radius: 30px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            cursor: pointer;
+            transition: transform 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);
+            transform-style: preserve-3d;
+            position: relative;
+        }
+        
+        .card.no-transition { transition: none !important; }
+        .card.flipped { transform: rotateY(180deg); }
+        
+        .card.correct-glow { box-shadow: 0 0 30px rgba(46, 204, 113, 0.8); border: 4px solid var(--success-color); }
+        .card.wrong-glow { box-shadow: 0 0 30px rgba(231, 76, 60, 0.8); border: 4px solid var(--error-color); }
+
+        .front, .back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            border-radius: 30px;
+            padding: 30px 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .front { background: linear-gradient(145deg, #ffffff, #f0f2f5); z-index: 2; transform: rotateY(0deg); }
+        .back { background: linear-gradient(145deg, #f8f9fa, #e9ecef); transform: rotateY(180deg); }
+
+        /* === 內容排版 === */
+        #word-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+
+        #word {
+            font-size: 2.8em;
+            font-weight: 800;
+            color: #1a1a1a;
+            line-height: 1.1;
+            margin: 0;
+            word-wrap: break-word;
+        }
+        
+        .word-hidden { color: var(--hidden-text-color) !important; text-shadow: none !important; }
+        
+        #pos {
+            font-size: 0.85em;
+            font-weight: 700;
+            color: #1a1a1a;
+            background-color: #76b852; /* NVIDIA Green */
+            padding: 4px 10px;
+            border-radius: 20px;
+            margin-top: 10px;
+            text-transform: uppercase;
+        }
+
+        #chinese-front { font-size: 1.6em; color: #555; margin-top: 10px; font-weight: 600; opacity: 0.9; }
+
+        .sentence-en {
+            font-size: 1.15em;
+            line-height: 1.5;
+            color: #34495e;
+            font-weight: 500;
+            margin-top: 20px;
+            max-width: 95%;
+            min-height: 1.5em;
+        }
+        
+        .sentence-hidden { color: var(--hidden-text-color) !important; min-height: 3em; user-select: none; text-decoration: none !important; }
+        .sentence-zh { font-size: 1.0em; color: #666; margin-top: 15px; }
+        
+        .highlight { color: #2c3e50; font-weight: 800; background: rgba(118, 184, 82, 0.3); padding: 0 4px; border-radius: 4px; }
+        .cloze-blank { color: #76b852; font-weight: 700; text-decoration: underline; padding: 0 8px; font-size: 1.2em; }
+        .revealed-answer { color: #76b852; font-weight: 800; text-decoration: underline; padding: 0 5px; }
+
+        /* 打字挑戰區 */
+        .typing-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 90%;
+            margin-top: 20px;
+        }
+
+        #typing-input {
+            width: 100%;
+            padding: 15px 20px;
+            border-radius: 15px;
+            border: 2px solid #ccc;
+            font-size: 1.3em;
+            text-align: center;
+            color: #333;
+            outline: none;
+            transition: all 0.2s ease;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
+            font-family: inherit;
+            background: #fff;
+        }
+
+        #typing-input:focus { border-color: #76b852; box-shadow: 0 0 10px rgba(118, 184, 82, 0.4); }
+        
+        #typing-feedback {
+            margin-top: 15px;
+            font-size: 1.5em;
+            font-weight: 800;
+            min-height: 1.5em;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .pass-text { color: var(--success-color); }
+        .fail-text { color: var(--error-color); }
+
+        /* === 控制按鈕區 === */
+        .controls-container {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 25px;
+            padding: 15px;
+            width: 100%;
+            border: 1px solid var(--glass-border);
+            margin-bottom: 15px;
+        }
+
+        .challenge-hidden { display: none !important; }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .controls:last-child { margin-bottom: 0; }
+
+        button {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 1.4em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        }
+
+        button:active { transform: scale(0.92); background: rgba(255,255,255,0.3); }
+        
+        .action-btn { width: auto; padding: 0 25px; border-radius: 25px; font-size: 1.1em; font-weight: 600; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: none; }
+        .speak-btn { background: #76b852; border: none; width: 60px; height: 60px; font-size: 1.8em; box-shadow: 0 4px 15px rgba(118, 184, 82, 0.4); color: #1a1a1a; }
+        .challenge-controls .speak-btn { width: 80px; height: 80px; font-size: 2.5em; margin: 0 10px; }
+
+        #autoplay-btn { background: var(--success-color); border: none; }
+        #learned-btn { background: #f1c40f; color: #1a1a1a; }
+        #challenge-submit-btn { background: #2980b9; color: white; }
+        #challenge-next-btn { background: var(--success-color); color: white; }
+        #shuffle-btn { background: #e74c3c; border: none; }
+
+        /* === 設定選項區 === */
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            width: 100%;
+        }
+        
+        #challenge-play-mode-settings { display: none; }
+        .learn-mode-btn[data-mode="challenge"].active ~ #challenge-play-mode-settings { display: block; grid-column: span 2; }
+
+        .setting-group {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .setting-group.full-width { grid-column: span 2; }
+
+        .setting-label {
+            font-size: 0.8em;
+            margin-bottom: 8px;
+            opacity: 0.8;
+            text-transform: uppercase;
+            font-weight: 600;
+            color: #ddd;
+        }
+
+        .setting-buttons {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .setting-btn {
+            width: auto;
+            height: 32px;
+            padding: 0 12px;
+            border-radius: 16px;
+            font-size: 0.85em;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: #aaa;
+        }
+
+        .setting-btn.active { background: #76b852; color: #1a1a1a; font-weight: 700; }
+        .progress { margin-top: 15px; font-size: 1em; opacity: 0.8; font-weight: 500; padding-bottom: 20px; }
+        
+        /* 檔案上傳區塊 */
+        .data-management {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .file-input-wrapper {
+            margin-bottom: 10px;
+        }
+        
+        .danger-btn {
+            background: #e74c3c !important;
+            color: white !important;
+            margin-top: 10px;
+        }
+
+        @media (max-height: 700px) {
+            .card-wrapper { height: 40vh; }
+            #word { font-size: 2.2em; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div id="combo-display" class="combo-container">COMBO x0</div>
+
+        <div class="card-wrapper">
+            <div class="card" id="card">
+                <div class="front">
+                    <div id="word-info">
+                        <h2 id="word">Ready?</h2>
+                        <span id="pos">Welcome</span> 
+                    </div>
+                    <div class="chinese" id="chinese-front">請匯入單字表</div>
+                    <div class="sentence-en" id="sentence-en-front"></div>
+                    
+                    <div class="typing-container challenge-hidden" id="challenge-area">
+                        <input type="text" id="typing-input" placeholder="請輸入答案" disabled>
+                        <div id="typing-feedback"></div>
+                    </div>
+                </div>
+                <div class="back">
+                    <div class="sentence-en" id="sentence-en-back"></div>
+                    <div class="sentence-zh" id="sentence-zh"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls-container">
+            <div class="controls default-controls" id="default-controls">
+                <button onclick="prevCard()">◀</button>
+                <button onclick="toggleFlip()">↻</button>
+                <button id="shuffle-btn" onclick="shuffleVocab()">🔀</button>
+                <button id="autoplay-btn" onclick="toggleAutoplay()">▶</button>
+                <button class="speak-btn" onclick="repeatAndDelaySpeak()">🔊</button>
+                <button class="toggle-chinese-btn" onclick="toggleChinese()">👁</button>
+                <button onclick="nextCard()">▶</button>
+            </div>
+            
+            <div class="controls challenge-controls challenge-hidden" id="challenge-controls">
+                <button class="speak-btn" onclick="repeatChallengeSpeak()">🔊</button>
+                <button class="action-btn" id="challenge-submit-btn" onclick="submitChallenge()">送出</button>
+                <button class="action-btn challenge-hidden" id="challenge-next-btn" onclick="handleChallengeNext()">下一題 ➔</button>
+            </div>
+
+            <div class="controls">
+                <button id="learned-btn" class="action-btn" onclick="markLearned()">標記學會</button>
+            </div>
+        </div>
+        
+        <div class="settings-grid">
+            <div class="setting-group full-width">
+                <div class="setting-label">模式</div>
+                <div class="setting-buttons">
+                    <button class="setting-btn learn-mode-btn active" data-mode="learn" onclick="setLearnMode('learn')">瀏覽</button>
+                    <button class="setting-btn learn-mode-btn" data-mode="challenge" onclick="setLearnMode('challenge')">挑戰</button>
+                </div>
+            </div>
+
+            <div class="setting-group full-width">
+                <div class="setting-label">單字篩選</div>
+                <div class="setting-buttons">
+                    <button class="setting-btn filter-btn active" data-filter="all" onclick="setFilterMode('all')">全部</button>
+                    <button class="setting-btn filter-btn" data-filter="unlearned" onclick="setFilterMode('unlearned')">未學會</button>
+                    <button class="setting-btn filter-btn" data-filter="learned" onclick="setFilterMode('learned')">已學會</button>
+                </div>
+            </div>
+
+            <div class="setting-group full-width" id="play-mode-settings">
+                <div class="setting-label">顯示內容</div>
+                <div class="setting-buttons">
+                    <button class="setting-btn mode-btn active" data-mode="word_only" onclick="setPlayMode('word_only')">單字</button>
+                    <button class="setting-btn mode-btn" data-mode="sentence_only" onclick="setPlayMode('sentence_only')">例句</button>
+                    <button class="setting-btn mode-btn" data-mode="both" onclick="setPlayMode('both')">全部</button>
+                </div>
+            </div>
+
+            <div class="setting-group full-width" id="challenge-play-mode-settings">
+                <div class="setting-label">挑戰類型</div>
+                <div class="setting-buttons">
+                    <button class="setting-btn c-mode-btn active" data-cmode="typing" onclick="setChallengeMode('typing')">填空</button>
+                    <button class="setting-btn c-mode-btn" data-cmode="listen_word" onclick="setChallengeMode('listen_word')">聽單字</button>
+                    <button class="setting-btn c-mode-btn" data-cmode="listen_sentence" onclick="setChallengeMode('listen_sentence')">聽例句</button>
+                </div>
+            </div>
+            
+            <div class="setting-group full-width" id="delay-settings">
+                 <div class="setting-label">自動播放間隔</div>
+                 <div class="setting-buttons">
+                     <button class="setting-btn transition-delay-btn active" data-delay="2" onclick="setTransitionDelay(2)">2s</button>
+                     <button class="setting-btn transition-delay-btn" data-delay="3" onclick="setTransitionDelay(3)">3s</button>
+                 </div>
+            </div>
+
+            <div class="setting-group" id="rate-settings">
+                <div class="setting-label">語速</div>
+                <div class="setting-buttons">
+                    <button class="setting-btn rate-btn" data-rate="0.75" onclick="setRate(0.75)">0.75</button>
+                    <button class="setting-btn rate-btn active" data-rate="1" onclick="setRate(1)">1.0</button>
+                    <button class="setting-btn rate-btn" data-rate="1.25" onclick="setRate(1.25)">1.25</button>
+                </div>
+            </div>
+
+            <div class="setting-group" id="repeat-settings">
+                <div class="setting-label">重複朗讀</div>
+                <div class="setting-buttons">
+                    <button class="setting-btn repeat-btn active" data-repeat="1" onclick="setRepeat(1)">1次</button>
+                    <button class="setting-btn repeat-btn" data-repeat="2" onclick="setRepeat(2)">2次</button>
+                    <button class="setting-btn repeat-btn" data-repeat="3" onclick="setRepeat(3)">3次</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="data-management">
+            <div class="setting-label" style="margin-bottom:10px;">資料管理</div>
+            <div class="file-input-wrapper">
+                <input type="file" id="csv-input" accept=".csv" style="color:white;">
+            </div>
+            <button class="setting-btn" onclick="handleFileUpload()" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #76b852; color: #76b852;">匯入 CSV</button>
+            <button class="setting-btn danger-btn" onclick="clearData()" style="width:100%; padding:10px;">恢復預設題庫</button>
+            <p style="font-size:0.8em; margin-top:10px; opacity:0.7;">支援格式: ID,英文,中文,詞性,英文例句,中文例句</p>
+        </div>
+
+        <div class="progress" id="progress"></div>
+    </div>
+
+    <script>
+        // === 1. 資料區 ===
+        let defaultVocab = [
+            {id: 1, en: "Ready", ch: "準備好了嗎？", pos: "Start", enSent: "Please import your vocabulary CSV file.", zhSent: "請匯入你的單字 CSV 檔案。"}
+        ];
+        
+        let storedVocab = localStorage.getItem('myVocabData');
+        let initialVocab = storedVocab ? JSON.parse(storedVocab) : [...defaultVocab];
+
+        let vocab = [...initialVocab]; 
+        let learnedIds = new Set(); 
+        
+        let storedLearned = localStorage.getItem('myLearnedIds');
+        if (storedLearned) learnedIds = new Set(JSON.parse(storedLearned));
+
+        let current = 0;
+        let rate = 1.0;
+        let repeatCount = 1; 
+        let transitionDelay = 2; 
+        let chineseVisible = true;
+        let playMode = 'word_only';     
+        let learnMode = 'learn';        
+        let challengeMode = 'typing';   
+        let filterMode = 'all'; 
+        
+        let isAnswerRevealed = false; 
+        let comboCount = 0; 
+
+        let voiceList = []; 
+        let currentDelayTimeout = null; 
+        let autoplayRunning = false; 
+        let isSpeaking = false; 
+
+        // DOM Elements
+        const card = document.getElementById('card');
+        const wordEl = document.getElementById('word');
+        const posEl = document.getElementById('pos'); 
+        const chineseFrontEl = document.getElementById('chinese-front');
+        const sentEnFrontEl = document.getElementById('sentence-en-front');
+        const sentEnBackEl = document.getElementById('sentence-en-back');
+        const sentZhEl = document.getElementById('sentence-zh');
+        const progressEl = document.getElementById('progress');
+        const learnedBtn = document.getElementById('learned-btn');
+        const challengeArea = document.getElementById('challenge-area');
+        const typingInput = document.getElementById('typing-input');
+        const typingFeedback = document.getElementById('typing-feedback');
+        const defaultControls = document.getElementById('default-controls');
+        const challengeControls = document.getElementById('challenge-controls');
+        const challengeSubmitBtn = document.getElementById('challenge-submit-btn');
+        const challengeNextBtn = document.getElementById('challenge-next-btn');
+        const playModeSettings = document.getElementById('play-mode-settings');
+        const challengePlayModeSettings = document.getElementById('challenge-play-mode-settings');
+        const delaySettings = document.getElementById('delay-settings');
+        const rateSettings = document.getElementById('rate-settings');
+        const repeatSettings = document.getElementById('repeat-settings');
+        const comboEl = document.getElementById('combo-display'); 
+
+        function loadVoices() { voiceList = window.speechSynthesis.getVoices(); }
+        if (window.speechSynthesis.onvoiceschanged !== undefined) window.speechSynthesis.onvoiceschanged = loadVoices;
+        
+        // === 資料處理功能 ===
+        
+        function saveData() {
+            localStorage.setItem('myVocabData', JSON.stringify(initialVocab));
+            localStorage.setItem('myLearnedIds', JSON.stringify(Array.from(learnedIds)));
+        }
+
+        function handleFileUpload() {
+            const input = document.getElementById('csv-input');
+            const file = input.files[0];
+            if (!file) {
+                alert("請先選擇 CSV 檔案！");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                parseCSV(text);
+            };
+            reader.readAsText(file);
+        }
+
+        // === 智慧 CSV 解析函數 ===
+        function parseCSV(text) {
+            const lines = text.split('\n');
+            const newVocab = [];
+            let idCounter = 1;
+
+            for (let i = 0; i < lines.length; i++) {
+                // 跳過空行
+                const line = lines[i].trim();
+                if (!line) continue;
+
+                // 1. 使用正規表達式處理 CSV 分隔 (支援引號內包含逗號的情況)
+                const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(p => p.trim().replace(/^"|"$/g, ''));
+                
+                // 2. 忽略標題列 (如果第一欄是 id 或 en)
+                if (parts[0].toLowerCase() === 'id' || (parts[0].toLowerCase() === 'en' && parts[1])) {
+                    continue;
+                }
+
+                // 3. 智慧判斷欄位 (處理有 ID 和沒 ID 的情況)
+                let item = {};
+                
+                // 情況 A: 6個欄位 (包含 ID) -> id, en, ch, pos, enSent, zhSent
+                if (parts.length >= 6 && !isNaN(parseInt(parts[0]))) {
+                    item = {
+                        id: parseInt(parts[0]),
+                        en: parts[1],
+                        ch: parts[2],
+                        pos: parts[3],
+                        enSent: parts[4],
+                        zhSent: parts[5]
+                    };
+                } 
+                // 情況 B: 5個欄位 (不含 ID) -> en, ch, pos, enSent, zhSent
+                else if (parts.length >= 5) {
+                    item = {
+                        id: idCounter++,
+                        en: parts[0],
+                        ch: parts[1],
+                        pos: parts[2],
+                        enSent: parts[3],
+                        zhSent: parts[4]
+                    };
+                }
+                // 情況 C: 只有基本欄位
+                else if (parts.length >= 2) {
+                     item = {
+                        id: idCounter++,
+                        en: parts[0],
+                        ch: parts[1],
+                        pos: "",
+                        enSent: parts[0],
+                        zhSent: ""
+                    };
+                }
+
+                // 確保有資料才加入
+                if (item.en) {
+                    newVocab.push(item);
+                }
+            }
+
+            if (newVocab.length > 0) {
+                initialVocab = newVocab;
+                vocab = [...initialVocab];
+                learnedIds = new Set(); // 重置學習狀態，因為 ID 可能變了
+                saveData();
+                setFilterMode('all');
+                alert(`成功匯入 ${newVocab.length} 個單字！\n資料格式已自動修正。`);
+            } else {
+                alert("匯入失敗：無法識別資料格式。\n請確認 CSV 編碼為 UTF-8，且格式正確。");
+            }
+        }
+
+        function clearData() {
+            if(confirm("確定要刪除所有匯入資料並恢復預設嗎？")) {
+                localStorage.removeItem('myVocabData');
+                localStorage.removeItem('myLearnedIds');
+                initialVocab = [...defaultVocab];
+                learnedIds = new Set();
+                setFilterMode('all');
+                alert("已恢復預設題庫。");
+            }
+        }
+
+        // === 核心邏輯 ===
+
+        function getClozeSentence(word, sentence) {
+            if (!word || !sentence) return "";
+            const escapedWord = word.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            const regex = new RegExp(`\\b(${escapedWord})([\\.\\,\\?\\!\\s]?)`, 'gi');
+            let replaced = sentence.replace(regex, '<span class="cloze-blank">___</span>$2');
+            
+            if (replaced === sentence) {
+                 const firstLetter = escapedWord.charAt(0);
+                 const restOfWord = escapedWord.slice(1);
+                 const wideRegex = new RegExp(`\\b([${firstLetter.toUpperCase()}${firstLetter.toLowerCase()}]${restOfWord})([\\.\\,\\?\\!\\s]?)`, 'g');
+                 replaced = sentence.replace(wideRegex, '<span class="cloze-blank">___</span>$2');
+            }
+            return replaced;
+        }
+        
+        function showCard() {
+            if (vocab.length === 0) {
+                wordEl.textContent = "沒有資料";
+                posEl.textContent = "";
+                chineseFrontEl.textContent = "";
+                sentEnFrontEl.innerHTML = "請匯入資料";
+                return;
+            }
+
+            const v = vocab[current];
+            const isLearned = learnedIds.has(v.id);
+            
+            wordEl.textContent = v.en;
+            posEl.textContent = v.pos; 
+            chineseFrontEl.textContent = v.ch;
+
+            wordEl.classList.remove('word-hidden');
+            sentEnFrontEl.classList.remove('sentence-hidden');
+
+            let frontSentenceContent = '';
+
+            if (learnMode === 'challenge') {
+                if (isAnswerRevealed) {
+                    wordEl.classList.remove('word-hidden'); 
+                } else {
+                    wordEl.classList.add('word-hidden');   
+                }
+
+                if (challengeMode === 'typing') {
+                    if (isAnswerRevealed) {
+                        const regex = new RegExp(`\\b(${v.en})\\b`, 'gi');
+                        frontSentenceContent = v.enSent.replace(regex, '<span class="revealed-answer">$1</span>');
+                    } else {
+                        frontSentenceContent = getClozeSentence(v.en, v.enSent);
+                    }
+                } else if (challengeMode === 'listen_word') {
+                    frontSentenceContent = isAnswerRevealed ? v.enSent : '';
+                } else if (challengeMode === 'listen_sentence') {
+                    frontSentenceContent = v.enSent;
+                    if (!isAnswerRevealed) sentEnFrontEl.classList.add('sentence-hidden');
+                }
+
+                if (isAnswerRevealed) {
+                    chineseFrontEl.style.opacity = '1';
+                } else {
+                    chineseFrontEl.style.opacity = (challengeMode === 'listen_word') ? '1' : '0';
+                }
+                
+                if (!isAnswerRevealed) {
+                    typingInput.placeholder = challengeMode.includes('listen') ? '請聽寫...' : '請輸入答案...';
+                }
+
+            } else {
+                chineseFrontEl.style.opacity = chineseVisible ? '1' : '0';
+                if (playMode === 'word_only') frontSentenceContent = ''; 
+                else if (playMode === 'both' || playMode === 'sentence_only') frontSentenceContent = v.enSent;
+            }
+            
+            sentEnFrontEl.innerHTML = frontSentenceContent;
+
+            const escapedWord = v.en.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            const regex = new RegExp(`\\b(${escapedWord})([\\.\\,\\?\\!\\s]?)`, 'gi');
+            sentEnBackEl.innerHTML = v.enSent.replace(regex, '<span class="highlight">$1</span>$2');
+            sentZhEl.textContent = v.zhSent;
+            sentZhEl.style.opacity = chineseVisible ? '1' : '0';
+            
+            progressEl.textContent = `${current + 1} / ${vocab.length}`;
+            card.classList.toggle('learned', isLearned); 
+            learnedBtn.textContent = isLearned ? '✓ 已學會' : '標記學會';
+            learnedBtn.style.background = isLearned ? '#2ecc71' : '#f1c40f';
+            learnedBtn.style.color = isLearned ? '#fff' : '#1a1a1a';
+        }
+
+        function submitChallenge() {
+            if (vocab.length === 0) return;
+            const v = vocab[current];
+            const userAnswer = typingInput.value.trim().toLowerCase();
+            let isCorrect = false;
+
+            if (challengeMode === 'listen_sentence') {
+                const correctText = v.enSent.trim().toLowerCase().replace(/[.,?!]/g, ''); 
+                const cleanedUserAnswer = userAnswer.replace(/[.,?!]/g, '');
+                isCorrect = (cleanedUserAnswer === correctText);
+            } else {
+                const possibleAnswers = new Set([v.en.trim().toLowerCase()]);
+                const regex = new RegExp(`\\b(${v.en})\\b`, 'gi');
+                const sentenceMatch = v.enSent.match(regex);
+                if(sentenceMatch) sentenceMatch.forEach(match => possibleAnswers.add(match.toLowerCase().trim()));
+                isCorrect = possibleAnswers.has(userAnswer);
+            }
+
+            if (isCorrect) handleCorrect(v);
+            else handleIncorrect(v);
+        }
+
+        function handleCorrect(v) {
+            comboCount++;
+            updateComboVisuals();
+
+            typingInput.disabled = true;
+            typingInput.style.borderColor = 'var(--success-color)';
+            
+            typingFeedback.innerHTML = '<span class="pass-text">🎉 PASS</span>';
+            card.classList.add('correct-glow'); 
+            
+            isAnswerRevealed = true;
+            showCard();
+
+            challengeSubmitBtn.classList.add('challenge-hidden');
+            challengeNextBtn.classList.remove('challenge-hidden');
+            
+            if (!learnedIds.has(v.id)) markLearned();
+        }
+
+        function handleIncorrect(v) {
+            comboCount = 0;
+            updateComboVisuals();
+            
+            if (filterMode !== 'learned') {
+                const currentCard = vocab[current];
+                vocab.splice(current + 4, 0, currentCard);
+                progressEl.textContent = `${current + 1} / ${vocab.length}`;
+            }
+
+            typingInput.disabled = true;
+            typingInput.style.borderColor = 'var(--error-color)';
+            
+            const ans = challengeMode === 'listen_sentence' ? v.enSent : v.en;
+            typingFeedback.innerHTML = `<span class="fail-text">❌ FAIL</span> <span style="font-size:0.7em; display:block; margin-top:5px; color:#fff;">${ans}</span>`;
+            card.classList.add('wrong-glow'); 
+
+            isAnswerRevealed = true;
+            showCard();
+
+            challengeSubmitBtn.classList.add('challenge-hidden');
+            challengeNextBtn.classList.remove('challenge-hidden');
+        }
+
+        function updateComboVisuals() {
+            if (comboCount > 1) {
+                comboEl.textContent = `COMBO x${comboCount} 🔥`;
+                comboEl.classList.add('combo-active');
+                if (comboCount >= 5) comboEl.classList.add('combo-fire');
+            } else {
+                comboEl.classList.remove('combo-active', 'combo-fire');
+                comboEl.textContent = '';
+            }
+        }
+
+        function handleChallengeNext() {
+            card.classList.remove('correct-glow', 'wrong-glow');
+            nextCard();
+        }
+
+        function resetChallenge() {
+            isAnswerRevealed = false;
+            typingInput.value = '';
+            typingInput.disabled = false;
+            typingInput.style.borderColor = '#ccc';
+            typingInput.placeholder = '請輸入答案...';
+            typingFeedback.innerHTML = '';
+            
+            challengeSubmitBtn.classList.remove('challenge-hidden');
+            challengeNextBtn.classList.add('challenge-hidden');
+            
+            card.classList.remove('flipped'); 
+            setTimeout(() => typingInput.focus(), 100);
+        }
+
+        function nextCard() {
+            if (vocab.length === 0) return;
+            if (learnMode === 'challenge') {
+                current = (current + 1) % vocab.length;
+                resetChallenge();
+                showCard();
+                repeatChallengeSpeak();
+            } else {
+                card.classList.remove('flipped');
+                current = (current + 1) % vocab.length;
+                showCard();
+            }
+        }
+        
+        function prevCard() {
+            if (vocab.length === 0) return;
+            if (learnMode === 'challenge') {
+                 current = (current - 1 + vocab.length) % vocab.length;
+                 resetChallenge();
+                 showCard();
+            } else {
+                card.classList.remove('flipped');
+                current = (current - 1 + vocab.length) % vocab.length;
+                showCard();
+            }
+        }
+
+        function toggleFlip() { 
+            if (learnMode === 'challenge' || vocab.length === 0) return;
+            card.classList.toggle('flipped'); 
+        }
+
+        function setLearnMode(mode) {
+            learnMode = mode;
+            updateBtnState('.learn-mode-btn', 'mode', mode);
+            
+            const isChallenge = (mode === 'challenge');
+            defaultControls.classList.toggle('challenge-hidden', isChallenge);
+            challengeControls.classList.toggle('challenge-hidden', !isChallenge);
+            playModeSettings.classList.toggle('challenge-hidden', isChallenge);
+            challengePlayModeSettings.classList.toggle('challenge-hidden', !isChallenge);
+            delaySettings.classList.toggle('challenge-hidden', isChallenge);
+            challengeArea.classList.toggle('challenge-hidden', !isChallenge);
+            
+            repeatSettings.classList.toggle('challenge-hidden', isChallenge);
+
+            if (isChallenge) {
+                chineseVisible = false;
+                shuffleVocab(); 
+                resetChallenge();
+                comboCount = 0; 
+                updateComboVisuals();
+            } else {
+                chineseVisible = true;
+                typingInput.disabled = true;
+                card.classList.remove('correct-glow', 'wrong-glow');
+                setPlayMode('word_only');
+                comboEl.textContent = ''; 
+            }
+            showCard();
+        }
+
+        function setFilterMode(mode) {
+            filterMode = mode;
+            updateBtnState('.filter-btn', 'filter', mode);
+            
+            if (mode === 'all') {
+                vocab = [...initialVocab];
+            } else if (mode === 'learned') {
+                vocab = initialVocab.filter(v => learnedIds.has(v.id));
+            } else if (mode === 'unlearned') {
+                vocab = initialVocab.filter(v => !learnedIds.has(v.id));
+            }
+            
+            current = 0;
+            if (learnMode === 'challenge') resetChallenge();
+            showCard();
+        }
+
+        function setPlayMode(mode) {
+            playMode = mode;
+            updateBtnState('.mode-btn', 'mode', mode);
+            showCard();
+        }
+        function setChallengeMode(mode) {
+            challengeMode = mode;
+            updateBtnState('.c-mode-btn', 'cmode', mode);
+            resetChallenge();
+            showCard();
+            if (learnMode === 'challenge') repeatChallengeSpeak();
+        }
+        function setTransitionDelay(val) {
+            transitionDelay = parseInt(val);
+            updateBtnState('.transition-delay-btn', 'delay', val);
+        }
+        function setRate(val) {
+            rate = parseFloat(val);
+            updateBtnState('.rate-btn', 'rate', val);
+        }
+        function setRepeat(val) {
+            repeatCount = parseInt(val);
+            updateBtnState('.repeat-btn', 'repeat', val);
+        }
+        function toggleChinese() { chineseVisible = !chineseVisible; showCard(); }
+        
+        function markLearned() {
+            if (vocab.length === 0) return;
+            const id = vocab[current].id;
+            
+            if (learnedIds.has(id)) {
+                learnedIds.delete(id);
+            } else {
+                learnedIds.add(id);
+            }
+            
+            saveData(); 
+            showCard(); 
+        }
+        
+        function shuffleVocab() {
+            if (vocab.length === 0) return;
+            for (let i = vocab.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [vocab[i], vocab[j]] = [vocab[j], vocab[i]];
+            }
+            current = 0;
+            showCard();
+        }
+        function updateBtnState(sel, attr, val) {
+            document.querySelectorAll(sel).forEach(btn => btn.classList.toggle('active', btn.dataset[attr] == val));
+        }
+
+        function repeatChallengeSpeak() {
+            if (vocab.length === 0) return;
+            const v = vocab[current];
+            let text = '';
+            if (challengeMode === 'typing' || challengeMode === 'listen_sentence') text = v.enSent;
+            else if (challengeMode === 'listen_word') text = v.en;
+            if (text) speakOnce(text);
+        }
+        
+        function speakOnce(text, cb) {
+            speechSynthesis.cancel();
+            const utter = new SpeechSynthesisUtterance(text);
+            utter.lang = 'en-US';
+            utter.rate = rate; 
+            utter.onend = () => { if(cb) cb(); };
+            speechSynthesis.speak(utter);
+        }
+        
+        function repeatAndDelaySpeak(callback) {
+            if (vocab.length === 0) { if(callback) callback(); return; }
+            const v = vocab[current];
+            const textToSpeak = [];
+            
+            if (playMode === 'word_only' || playMode === 'both') textToSpeak.push(v.en);
+            if (playMode === 'sentence_only' || playMode === 'both') textToSpeak.push(v.enSent);
+
+            if (textToSpeak.length === 0) { if(callback) callback(); return; }
+
+            let repeatIndex = 0;
+            let currentItemIndex = 0;
+
+            function runCycle() {
+                if (currentItemIndex < textToSpeak.length) {
+                    speakOnce(textToSpeak[currentItemIndex], () => {
+                        currentItemIndex++;
+                        if (currentItemIndex < textToSpeak.length) {
+                            setTimeout(runCycle, 500);
+                        } else {
+                            repeatIndex++;
+                            if (repeatIndex < repeatCount) {
+                                currentItemIndex = 0;
+                                setTimeout(runCycle, 1000);
+                            } else {
+                                if(callback) callback();
+                            }
+                        }
+                    });
+                }
+            }
+            runCycle();
+        }
+        
+        function toggleAutoplay() {
+            if (autoplayRunning) {
+                autoplayRunning = false;
+                document.getElementById('autoplay-btn').textContent = '▶';
+            } else {
+                autoplayRunning = true;
+                document.getElementById('autoplay-btn').textContent = '⏸';
+                runAutoplay();
+            }
+        }
+        function runAutoplay() {
+            if (!autoplayRunning) return;
+            repeatAndDelaySpeak(() => {
+                setTimeout(() => {
+                    if (autoplayRunning) { nextCard(); runAutoplay(); }
+                }, transitionDelay * 1000);
+            });
+        }
+
+        typingInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                if (!typingInput.disabled) submitChallenge();
+                else if (!challengeNextBtn.classList.contains('challenge-hidden')) handleChallengeNext();
+            }
+        });
+
+        loadVoices();
+        // 預設載入
+        setLearnMode('learn');
+    </script>
+</body>
+</html>
