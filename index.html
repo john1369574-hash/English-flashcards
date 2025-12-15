@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>NVIDIA Vocab - Exam Pro</title>
+    <style>
+        :root {
+            --bg-color: #050505;
+            --card-bg: #1a1a1a;
+            --nvidia-green: #76b852;
+            --nvidia-dark: #4a802a;
+            --text-main: #ffffff;
+            --text-sub: #888;
+            --border-color: #333;
+            --highlight: #66fcf1;
+            --error: #e74c3c;
+            --success: #2ecc71;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: 'Segoe UI', Roboto, "Microsoft JhengHei", sans-serif;
+            background-color: var(--bg-color);
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 30px 30px;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            color: var(--text-main);
+            overflow: hidden;
+        }
+
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            max-width: 600px;
+            margin: 0 auto;
+            width: 100%;
+            position: relative;
+        }
+
+        /* === 頂部導航 === */
+        .top-nav {
+            width: 100%;
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            padding: 5px;
+            background: #111;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+
+        .nav-tab {
+            flex: 1;
+            text-align: center;
+            padding: 8px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-weight: bold;
+            color: #666;
+            transition: all 0.3s;
+        }
+        .nav-tab.active { background: var(--nvidia-green); color: #000; }
+
+        /* === 視圖容器 === */
+        .view-section {
+            width: 100%;
+            flex: 1;
+            display: none; /* 預設隱藏 */
+            flex-direction: column;
+        }
+        .view-section.active { display: flex; }
+
+        /* === 學習模式 (Learn Mode) === */
+        .header-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 10px;
+            color: var(--nvidia-green);
+            font-family: monospace;
+            border-bottom: 1px solid #333;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+
+        /* 跳轉功能 */
+        .jump-box {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .jump-input {
+            width: 60px;
+            background: #222;
+            border: 1px solid #444;
+            color: white;
+            padding: 2px 5px;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .card-wrapper {
+            flex: 1;
+            position: relative;
+            margin-bottom: 10px;
+            min-height: 200px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            width: 100%;
+            height: 100%;
+            border: 2px solid var(--nvidia-green);
+            border-radius: 12px;
+            box-shadow: 0 0 20px rgba(118, 184, 82, 0.1);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+            cursor: pointer;
+            overflow-y: auto;
+            position: relative;
+        }
+        .card:active { border-color: #fff; }
+
+        .word-en { font-size: 2.5em; font-weight: 800; color: #fff; margin-bottom: 5px; line-height: 1.1; }
+        .pos-tag { background: rgba(118, 184, 82, 0.2); color: var(--nvidia-green); padding: 2px 8px; border-radius: 4px; font-size: 0.8em; font-weight: bold; border: 1px solid var(--nvidia-green); margin-bottom: 10px; }
+        
+        .content-box { width: 100%; text-align: left; margin-top: 10px; padding: 10px; border-radius: 8px; display: none; }
+        .content-box.show { display: block; animation: fadeIn 0.3s; }
+        .sent-section { background: rgba(255,255,255,0.05); border-left: 3px solid var(--highlight); }
+        .sent-en { font-size: 1.1em; color: #ddd; line-height: 1.4; }
+        .highlight { color: var(--highlight); font-weight: bold; text-decoration: underline; }
+        .cn-section { border-top: 1px dashed #444; }
+        .word-ch { font-size: 1.3em; color: var(--nvidia-green); font-weight: bold; margin-bottom: 5px; }
+        .sent-ch { font-size: 1em; color: #aaa; }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* === 考試模式 (Exam Mode) === */
+        .exam-setup {
+            background: #111;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            margin-top: 20px;
+        }
+        .form-group { margin-bottom: 15px; }
+        .form-label { display: block; color: var(--nvidia-green); margin-bottom: 5px; font-size: 0.9em; font-weight: bold; }
+        .form-row { display: flex; gap: 10px; }
+        .form-input { 
+            flex: 1; 
+            background: #222; 
+            border: 1px solid #444; 
+            color: white; 
+            padding: 10px; 
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .exam-card {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            background: var(--card-bg);
+            border: 2px solid var(--highlight);
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+        }
+
+        .exam-question { font-size: 1.5em; margin-bottom: 20px; color: #fff; line-height: 1.4; }
+        .exam-input {
+            width: 100%;
+            padding: 12px;
+            font-size: 1.2em;
+            text-align: center;
+            border-radius: 8px;
+            border: 2px solid #555;
+            background: #000;
+            color: white;
+            margin-bottom: 15px;
+            outline: none;
+        }
+        .exam-input:focus { border-color: var(--highlight); }
+        .exam-feedback { font-size: 1.2em; font-weight: bold; min-height: 1.5em; margin-bottom: 10px; }
+        .feedback-correct { color: var(--success); }
+        .feedback-wrong { color: var(--error); }
+
+        /* === 控制面板共用 === */
+        .controls-panel {
+            width: 100%;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 10px;
+            margin-top: auto;
+        }
+
+        .row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+        
+        button {
+            flex: 1;
+            background: #222;
+            color: #ccc;
+            border: 1px solid #444;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.95em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        button:active { background: #333; transform: translateY(1px); }
+
+        .btn-green { background: var(--nvidia-green); color: #000; border: none; }
+        .btn-primary { background: var(--highlight); color: #000; border: none; }
+        .btn-danger { border-color: var(--error); color: var(--error); }
+        .btn-auto { border: 1px solid var(--highlight); color: var(--highlight); }
+        .btn-auto.playing { background: var(--highlight); color: #000; }
+
+        select { flex: 1; background: #222; color: white; border: 1px solid #444; padding: 8px; border-radius: 5px; }
+        
+        .learned-badge { position: absolute; top: 10px; right: 10px; font-size: 1.5em; display: none; }
+        .tap-hint { position: absolute; bottom: 8px; color: #555; font-size: 0.75em; font-family: monospace; }
+        
+        .progress-bar { width: 100%; height: 4px; background: #333; margin-top: 5px; border-radius: 2px; }
+        .progress-fill { height: 100%; background: var(--nvidia-green); width: 0%; transition: width 0.2s; }
+
+        input[type="file"] { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-tab active" onclick="switchView('learn')" id="tab-learn">📖 學習模式</div>
+            <div class="nav-tab" onclick="switchView('exam')" id="tab-exam">📝 考試模式</div>
+        </div>
+
+        <div id="view-learn" class="view-section active">
+            <div class="header-info">
+                <div class="jump-box">
+                    <span>ID:</span>
+                    <input type="number" id="jump-id" class="jump-input" placeholder="Go">
+                    <button onclick="jumpToId()" style="padding: 2px 8px; font-size:0.8em;">🚀</button>
+                </div>
+                <span id="deck-info">ALL</span>
+                <span id="counter">0/0</span>
+            </div>
+
+            <div class="card-wrapper">
+                <div class="card" onclick="stepLogic()">
+                    <div class="learned-badge" id="badge-learned">✅</div>
+                    
+                    <div id="part-word">
+                        <div class="word-en" id="text-en">LOADING</div>
+                        <span class="pos-tag" id="text-pos">...</span>
+                    </div>
+
+                    <div id="part-sent" class="content-box sent-section">
+                        <div class="sent-en" id="text-sent-en"></div>
+                    </div>
+
+                    <div id="part-cn" class="content-box cn-section">
+                        <div class="word-ch" id="text-ch"></div>
+                        <div class="sent-ch" id="text-sent-ch"></div>
+                    </div>
+                    <div class="tap-hint" id="hint-text">點擊顯示更多</div>
+                </div>
+            </div>
+
+            <div class="controls-panel">
+                <div class="row">
+                    <select id="filter-mode" onchange="applyFilter()" style="flex:1.2">
+                        <option value="all">全部</option>
+                        <option value="unlearned">未學會</option>
+                        <option value="learned">已學會</option>
+                    </select>
+                    <button id="btn-toggle-learned" onclick="toggleLearnedStatus()" style="font-size:0.8em">🎓 標記學會</button>
+                </div>
+                <div class="row">
+                    <select id="audio-mode" onchange="saveConfig()" style="flex:2">
+                        <option value="4">英單+中單</option>
+                        <option value="6" selected>全部(單+句+中)</option>
+                        <option value="1">僅英單</option>
+                        <option value="2">僅英句</option>
+                    </select>
+                    <select id="audio-rate" onchange="saveConfig()" style="flex:1">
+                        <option value="0.8">0.8x</option>
+                        <option value="1.0" selected>1.0x</option>
+                        <option value="1.2">1.2x</option>
+                    </select>
+                    <select id="repeat-count" onchange="saveConfig()" style="flex:1">
+                        <option value="1">1次</option>
+                        <option value="2">2次</option>
+                        <option value="3">3次</option>
+                    </select>
+                </div>
+                <div class="row">
+                    <button class="btn-green" onclick="playAudio()">🔊 播放</button>
+                    <button class="btn-auto" id="btn-auto" onclick="toggleAuto()">⚡ 自動</button>
+                </div>
+                <div class="row">
+                    <button onclick="prevCard()">⏮</button>
+                    <button onclick="stepLogic()" id="btn-step" style="flex:2; color:var(--nvidia-green);">顯示例句</button>
+                    <button onclick="nextCard()">⏭</button>
+                </div>
+                <div class="progress-bar"><div class="progress-fill" id="p-bar"></div></div>
+                <div class="row" style="margin-top:10px; border-top:1px solid #333; padding-top:5px;">
+                    <button onclick="document.getElementById('csv-file').click()">📂 匯入</button>
+                    <button onclick="shuffleData()">🔀 亂序</button>
+                    <button class="btn-danger" onclick="hardReset()">⚠️ 重置</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-exam" class="view-section">
+            <div id="exam-setup" class="exam-setup">
+                <h3 style="color:#fff; text-align:center; margin-top:0;">考試設定</h3>
+                <div class="form-group">
+                    <label class="form-label">ID 範圍 (Start - End)</label>
+                    <div class="form-row">
+                        <input type="number" id="exam-start" class="form-input" placeholder="1" value="1">
+                        <input type="number" id="exam-end" class="form-input" placeholder="100" value="50">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">考題來源</label>
+                    <select id="exam-source" class="form-input">
+                        <option value="all">範圍內全部</option>
+                        <option value="unlearned">範圍內未學會</option>
+                        <option value="learned">範圍內已學會</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">考試類型</label>
+                    <select id="exam-type" class="form-input">
+                        <option value="word_3x">👂 聽寫單字 (唸3次)</option>
+                        <option value="sentence_fill">📝 聽句填空</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">語音速度 (考試用)</label>
+                    <select id="exam-rate" class="form-input">
+                        <option value="0.7">0.7x (慢)</option>
+                        <option value="0.9">0.9x (稍慢)</option>
+                        <option value="1.0" selected>1.0x (正常)</option>
+                        <option value="1.2">1.2x (稍快)</option>
+                        <option value="1.5">1.5x (快)</option>
+                    </select>
+                </div>
+                <button class="btn-green" style="width:100%; padding:15px; font-size:1.2em;" onclick="startExam()">開始考試 🔥</button>
+            </div>
+
+            <div id="exam-active" style="display:none; flex:1; flex-direction:column;">
+                <div class="header-info">
+                    <span id="exam-progress">Q: 1 / 10</span>
+                    <span id="exam-score">Score: 0</span>
+                </div>
+                
+                <div class="card-wrapper">
+                    <div class="exam-card">
+                        <div id="exam-question-area" class="exam-question">
+                            🔊 聽寫模式：請仔細聽...
+                        </div>
+                        <input type="text" id="exam-input" class="exam-input" placeholder="在此輸入答案" autocomplete="off">
+                        <div id="exam-feedback" class="exam-feedback"></div>
+                    </div>
+                </div>
+
+                <div class="controls-panel">
+                    <div class="row">
+                        <button class="btn-primary" onclick="playExamAudio()">🔊 重聽題目</button>
+                        <button class="btn-green" id="btn-exam-submit" onclick="checkAnswer()">送出答案</button>
+                        <button class="btn-auto" id="btn-exam-next" onclick="nextQuestion()" style="display:none;">下一題 ⏭</button>
+                    </div>
+                    <div class="row">
+                        <button class="btn-danger" onclick="endExam()">❌ 結束考試</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <input type="file" id="csv-file" accept=".csv" onchange="importCSV(this)">
+    </div>
+
+    <script>
+        // === 全域變數 ===
+        let allVocab = [];
+        let displayDeck = [];
+        let learnedSet = new Set();
+        let currentIndex = 0;
+        let currentStep = 0; // 0:Word, 1:Sent, 2:All
+        let isAuto = false;
+        let isSpeaking = false;
+
+        // 考試變數
+        let examDeck = [];
+        let examIndex = 0;
+        let examScore = 0;
+        let examType = '';
+        let examRate = 1.0;
+        let currentQuestion = null;
+
+        // === 初始化 ===
+        function init() {
+            try {
+                const savedData = localStorage.getItem('nv_vocab');
+                const savedLearned = localStorage.getItem('nv_learned');
+                
+                if (savedData) allVocab = JSON.parse(savedData);
+                else allVocab = [{ id: 1, en: "Ready", ch: "準備", pos: "n.", enSent: "System ready.", zhSent: "系統就緒" }];
+
+                if (savedLearned) learnedSet = new Set(JSON.parse(savedLearned));
+
+                loadConfig('audio-mode', 'nv_amode');
+                loadConfig('filter-mode', 'nv_filter');
+                
+                applyFilter(false); 
+                
+                // 恢復上次索引
+                const savedIdx = parseInt(localStorage.getItem('nv_index') || '0');
+                if(!isNaN(savedIdx) && savedIdx < displayDeck.length) currentIndex = savedIdx;
+                
+                renderCard();
+            } catch (e) {
+                console.error(e);
+                localStorage.clear();
+                location.reload();
+            }
+        }
+
+        function loadConfig(id, key) {
+            const val = localStorage.getItem(key);
+            if(val) document.getElementById(id).value = val;
+        }
+
+        function switchView(view) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+            document.getElementById(`view-${view}`).classList.add('active');
+            document.getElementById(`tab-${view}`).classList.add('active');
+            
+            // 停止任何正在播放的聲音
+            window.speechSynthesis.cancel();
+            isAuto = false;
+        }
+
+        // ================= 學習模式邏輯 =================
+
+        function applyFilter(reset = true) {
+            const mode = document.getElementById('filter-mode').value;
+            localStorage.setItem('nv_filter', mode);
+
+            if (mode === 'unlearned') {
+                displayDeck = allVocab.filter(v => !learnedSet.has(String(v.id)));
+                document.getElementById('deck-info').innerText = "未學會";
+            } else if (mode === 'learned') {
+                displayDeck = allVocab.filter(v => learnedSet.has(String(v.id)));
+                document.getElementById('deck-info').innerText = "已學會";
+            } else {
+                displayDeck = [...allVocab];
+                document.getElementById('deck-info').innerText = "全部";
+            }
+
+            if (displayDeck.length === 0) displayDeck = [{ id: 0, en: "No Data", ch: "無資料", pos: "", enSent: "Check filter.", zhSent: "" }];
+            
+            if (reset) {
+                currentIndex = 0;
+                currentStep = 0;
+                renderCard();
+            }
+        }
+
+        function renderCard() {
+            if (!displayDeck.length) return;
+            const v = displayDeck[currentIndex];
+            
+            document.getElementById('text-en').innerText = v.en;
+            document.getElementById('text-pos').innerText = v.pos || '';
+            
+            // 例句高亮
+            let sentHtml = v.enSent || "";
+            if (sentHtml && v.en) {
+                const esc = v.en.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                const reg = new RegExp(`(${esc})`, 'gi');
+                sentHtml = sentHtml.replace(reg, '<span class="highlight">$1</span>');
+            }
+            document.getElementById('text-sent-en').innerHTML = sentHtml;
+            document.getElementById('text-ch').innerText = v.ch || "";
+            document.getElementById('text-sent-ch').innerText = v.zhSent || "";
+
+            // 狀態
+            const isLearned = learnedSet.has(String(v.id));
+            const btnLearned = document.getElementById('btn-toggle-learned');
+            const badge = document.getElementById('badge-learned');
+            
+            if (isLearned) {
+                badge.style.display = 'block';
+                btnLearned.innerText = "✅ 已學會";
+                btnLearned.style.borderColor = "var(--success)";
+                btnLearned.style.color = "var(--success)";
+            } else {
+                badge.style.display = 'none';
+                btnLearned.innerText = "🎓 標記學會";
+                btnLearned.style.borderColor = "var(--text-sub)";
+                btnLearned.style.color = "var(--text-sub)";
+            }
+
+            document.getElementById('counter').innerText = `${currentIndex + 1}/${displayDeck.length}`;
+            const pct = ((currentIndex + 1) / displayDeck.length) * 100;
+            document.getElementById('p-bar').style.width = `${pct}%`;
+            
+            localStorage.setItem('nv_index', currentIndex);
+            updateVisibility();
+        }
+
+        function updateVisibility() {
+            const partSent = document.getElementById('part-sent');
+            const partCn = document.getElementById('part-cn');
+            const btn = document.getElementById('btn-step');
+            const hint = document.getElementById('hint-text');
+
+            partSent.classList.remove('show');
+            partCn.classList.remove('show');
+
+            if (currentStep === 0) {
+                btn.innerText = "顯示例句";
+                hint.innerText = "TAP TO SHOW SENTENCE";
+            } else if (currentStep === 1) {
+                partSent.classList.add('show');
+                btn.innerText = "顯示中文";
+                hint.innerText = "TAP TO SHOW CHINESE";
+            } else if (currentStep === 2) {
+                partSent.classList.add('show');
+                partCn.classList.add('show');
+                btn.innerText = "隱藏內容";
+                hint.innerText = "TAP TO HIDE";
+            }
+        }
+
+        function stepLogic() {
+            currentStep++;
+            if (currentStep > 2) currentStep = 0;
+            updateVisibility();
+        }
+
+        function nextCard() {
+            if (displayDeck.length === 0) return;
+            currentIndex = (currentIndex + 1) % displayDeck.length;
+            renderCard(); // 保持 step 狀態
+            if (isAuto) playAudio();
+        }
+
+        function prevCard() {
+            if (displayDeck.length === 0) return;
+            currentIndex = (currentIndex - 1 + displayDeck.length) % displayDeck.length;
+            renderCard();
+        }
+
+        function jumpToId() {
+            const targetId = parseInt(document.getElementById('jump-id').value);
+            if (isNaN(targetId)) return;
+            
+            // 在 displayDeck 中尋找該 ID
+            const foundIndex = displayDeck.findIndex(v => v.id === targetId);
+            if (foundIndex !== -1) {
+                currentIndex = foundIndex;
+                currentStep = 0;
+                renderCard();
+            } else {
+                alert(`ID ${targetId} 不在當前清單中 (請檢查篩選條件)`);
+            }
+        }
+
+        function toggleLearnedStatus() {
+            const v = displayDeck[currentIndex];
+            if (!v) return;
+            const idStr = String(v.id);
+            if (learnedSet.has(idStr)) learnedSet.delete(idStr);
+            else learnedSet.add(idStr);
+            
+            localStorage.setItem('nv_learned', JSON.stringify(Array.from(learnedSet)));
+            renderCard();
+        }
+
+        // ================= 語音邏輯 =================
+
+        function playAudio() {
+            if (displayDeck.length === 0) return;
+            window.speechSynthesis.cancel();
+            isSpeaking = true;
+
+            const v = displayDeck[currentIndex];
+            const mode = document.getElementById('audio-mode').value;
+            const repeat = parseInt(document.getElementById('repeat-count').value);
+            const rate = parseFloat(document.getElementById('audio-rate').value);
+
+            let seq = [];
+            if (mode=='1') seq.push({t:v.en, l:'en-US'});
+            if (mode=='2') seq.push({t:v.enSent, l:'en-US'});
+            if (mode=='4') seq.push({t:v.en, l:'en-US'}, {t:v.ch, l:'zh-TW'});
+            if (mode=='6') seq.push({t:v.en, l:'en-US'}, {t:v.enSent, l:'en-US'}, {t:v.ch, l:'zh-TW'}, {t:v.zhSent, l:'zh-TW'});
+
+            let fullQueue = [];
+            for(let i=0; i<repeat; i++) fullQueue = fullQueue.concat(seq);
+
+            speakQueue(fullQueue, rate);
+        }
+
+        function speakQueue(list, rate) {
+            if (list.length === 0) {
+                isSpeaking = false;
+                if (isAuto) setTimeout(() => { if(isAuto) nextCard(); }, 1500);
+                return;
+            }
+            const item = list.shift();
+            const u = new SpeechSynthesisUtterance(item.t);
+            u.lang = item.l;
+            u.rate = rate;
+            u.onend = () => setTimeout(() => speakQueue(list, rate), 300);
+            window.speechSynthesis.speak(u);
+        }
+
+        function toggleAuto() {
+            const btn = document.getElementById('btn-auto');
+            if (isAuto) {
+                isAuto = false;
+                window.speechSynthesis.cancel();
+                btn.classList.remove('playing');
+                btn.innerText = "⚡ 自動";
+            } else {
+                isAuto = true;
+                btn.classList.add('playing');
+                btn.innerText = "🛑 停止";
+                playAudio();
+            }
+        }
+
+        // ================= 考試模式邏輯 =================
+
+        function startExam() {
+            const startId = parseInt(document.getElementById('exam-start').value);
+            const endId = parseInt(document.getElementById('exam-end').value);
+            const source = document.getElementById('exam-source').value;
+            examType = document.getElementById('exam-type').value;
+            examRate = parseFloat(document.getElementById('exam-rate').value); // 獲取考試語速
+
+            if (isNaN(startId) || isNaN(endId)) {
+                alert("請輸入有效的 ID 範圍");
+                return;
+            }
+
+            // 篩選題庫
+            examDeck = allVocab.filter(v => {
+                const inRange = v.id >= startId && v.id <= endId;
+                if (!inRange) return false;
+                if (source === 'unlearned') return !learnedSet.has(String(v.id));
+                if (source === 'learned') return learnedSet.has(String(v.id));
+                return true;
+            });
+
+            if (examDeck.length === 0) {
+                alert("此範圍內無符合條件的單字！");
+                return;
+            }
+
+            // 亂序題庫
+            for (let i = examDeck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [examDeck[i], examDeck[j]] = [examDeck[j], examDeck[i]];
+            }
+
+            examIndex = 0;
+            examScore = 0;
+            document.getElementById('exam-setup').style.display = 'none';
+            document.getElementById('exam-active').style.display = 'flex';
+            
+            showQuestion();
+        }
+
+        function showQuestion() {
+            currentQuestion = examDeck[examIndex];
+            const qArea = document.getElementById('exam-question-area');
+            const input = document.getElementById('exam-input');
+            const feedback = document.getElementById('exam-feedback');
+            const btnSubmit = document.getElementById('btn-exam-submit');
+            const btnNext = document.getElementById('btn-exam-next');
+
+            document.getElementById('exam-progress').innerText = `Q: ${examIndex + 1} / ${examDeck.length}`;
+            document.getElementById('exam-score').innerText = `Score: ${examScore}`;
+            
+            input.value = '';
+            input.disabled = false;
+            feedback.innerText = '';
+            btnSubmit.style.display = 'block';
+            btnNext.style.display = 'none';
+            input.focus();
+
+            if (examType === 'word_3x') {
+                qArea.innerHTML = `<span style="font-size:3em">🔊</span><br>請聽音拼寫單字`;
+                playExamAudio();
+            } else if (examType === 'sentence_fill') {
+                // 挖空單字 (不分大小寫)
+                const word = currentQuestion.en;
+                const regex = new RegExp(`(${word})`, 'gi');
+                const maskedSent = currentQuestion.enSent.replace(regex, '______');
+                qArea.innerHTML = maskedSent;
+                playExamAudio();
+            }
+        }
+
+        function playExamAudio() {
+            window.speechSynthesis.cancel();
+            if (examType === 'word_3x') {
+                // 唸 3 次單字
+                let queue = [];
+                for(let i=0; i<3; i++) queue.push({t: currentQuestion.en, l:'en-US'});
+                speakQueue(queue, examRate);
+            } else if (examType === 'sentence_fill') {
+                // 唸完整句子
+                let queue = [{t: currentQuestion.enSent, l:'en-US'}];
+                speakQueue(queue, examRate);
+            }
+        }
+
+        function checkAnswer() {
+            const input = document.getElementById('exam-input');
+            const feedback = document.getElementById('exam-feedback');
+            const btnSubmit = document.getElementById('btn-exam-submit');
+            const btnNext = document.getElementById('btn-exam-next');
+            
+            const userAns = input.value.trim().toLowerCase();
+            const correctAns = currentQuestion.en.trim().toLowerCase();
+
+            input.disabled = true;
+            btnSubmit.style.display = 'none';
+            btnNext.style.display = 'block';
+
+            if (userAns === correctAns) {
+                feedback.innerHTML = "✅ 正確！";
+                feedback.className = "exam-feedback feedback-correct";
+                examScore += 10;
+            } else {
+                feedback.innerHTML = `❌ 錯誤<br>答案：<span style="color:var(--nvidia-green)">${currentQuestion.en}</span>`;
+                feedback.className = "exam-feedback feedback-wrong";
+            }
+            
+            document.getElementById('exam-score').innerText = `Score: ${examScore}`;
+        }
+
+        function nextQuestion() {
+            examIndex++;
+            if (examIndex < examDeck.length) {
+                showQuestion();
+            } else {
+                alert(`考試結束！\n總分：${examScore}\n答對率：${Math.round((examScore / (examDeck.length * 10)) * 100)}%`);
+                endExam();
+            }
+        }
+
+        function endExam() {
+            window.speechSynthesis.cancel();
+            document.getElementById('exam-active').style.display = 'none';
+            document.getElementById('exam-setup').style.display = 'block';
+        }
+
+        // ================= 檔案與工具 =================
+
+        function importCSV(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const text = e.target.result;
+                const lines = text.split('\n');
+                const newData = [];
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+                    const p = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(s => s.trim().replace(/^"|"$/g, ''));
+                    if (p[0].toLowerCase().includes('id') || p[0].toLowerCase() === 'en') continue;
+
+                    let item = {};
+                    if (p.length >= 6 && !isNaN(parseInt(p[0]))) {
+                        item = { id: parseInt(p[0]), en: p[1], ch: p[2], pos: p[3], enSent: p[4], zhSent: p[5] };
+                    } else if (p.length >= 5) {
+                        item = { id: i, en: p[0], ch: p[1], pos: p[2], enSent: p[3], zhSent: p[4] };
+                    }
+                    if (item.en) newData.push(item);
+                }
+
+                if (newData.length > 0) {
+                    allVocab = newData;
+                    localStorage.setItem('nv_vocab', JSON.stringify(allVocab));
+                    applyFilter(true);
+                    alert(`匯入成功！共 ${newData.length} 筆`);
+                } else {
+                    alert("匯入失敗");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function shuffleData() {
+            for (let i = allVocab.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [allVocab[i], allVocab[j]] = [allVocab[j], allVocab[i]];
+            }
+            localStorage.setItem('nv_vocab', JSON.stringify(allVocab));
+            applyFilter(true);
+            alert("題庫已亂序");
+        }
+
+        function hardReset() {
+            if (confirm("確定重置？")) {
+                localStorage.clear();
+                location.reload();
+            }
+        }
+
+        function saveConfig() {
+            localStorage.setItem('nv_amode', document.getElementById('audio-mode').value);
+        }
+
+        // Enter 鍵送出答案
+        document.getElementById('exam-input').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                if (!this.disabled) checkAnswer();
+                else nextQuestion();
+            }
+        });
+
+        init();
+    </script>
+</body>
+</html>
